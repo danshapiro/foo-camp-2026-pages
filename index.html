@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23103d37'/%3E%3Ctext x='32' y='43' text-anchor='middle' font-size='38' fill='%23d8f48d'%3EF%3C/text%3E%3C/svg%3E">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#103d37">
+  <title>Foo Camp 2026 · Enter passphrase</title>
+  <style>
+    :root { color-scheme: light; --paper:#f4f1e8; --forest:#103d37; --forest-dark:#082b27; --coral:#ef745b; --ink:#182520; --muted:#64726a; --line:#d8d7ca; --serif:Georgia,"Times New Roman",serif; --sans:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    * { box-sizing:border-box; }
+    body { min-height:100vh; margin:0; display:grid; place-items:center; padding:24px; background:radial-gradient(ellipse at 15% 12%,rgba(239,116,91,.13),transparent 28rem),var(--paper); color:var(--ink); font-family:var(--sans); }
+    .gate { width:min(100%,510px); padding:clamp(25px,7vw,48px); border:1px solid rgba(16,61,55,.13); border-radius:25px; background:#fffdf7; box-shadow:0 24px 70px rgba(27,43,34,.12); }
+    .brand { display:flex; align-items:center; gap:11px; margin-bottom:37px; color:var(--forest); }
+    .brand-mark { width:43px; height:43px; display:grid; place-items:center; border-radius:14px; background:var(--forest); color:#def28f; font-family:var(--serif); font-size:17px; font-weight:800; letter-spacing:-.08em; }
+    .brand-copy strong,.brand-copy span { display:block; }
+    .brand-copy strong { font-size:12px; letter-spacing:.1em; text-transform:uppercase; }
+    .brand-copy span { margin-top:3px; color:var(--muted); font-size:11px; }
+    .eyebrow { margin:0 0 10px; color:#536f54; font-size:10px; font-weight:850; letter-spacing:.2em; text-transform:uppercase; }
+    h1 { margin:0; font-family:var(--serif); font-size:clamp(35px,9vw,54px); font-weight:500; letter-spacing:-.055em; line-height:1.02; }
+    .summary { margin:16px 0 27px; color:var(--muted); font-size:14px; line-height:1.6; }
+    label { display:block; margin-bottom:8px; font-size:12px; font-weight:800; }
+    input { width:100%; min-height:51px; padding:12px 14px; border:1px solid #bfc9bf; border-radius:11px; background:white; color:var(--ink); font:inherit; font-size:16px; }
+    input:focus-visible,button:focus-visible { outline:3px solid var(--coral); outline-offset:3px; }
+    button { width:100%; min-height:50px; margin-top:12px; padding:12px 18px; border:0; border-radius:11px; background:var(--forest); color:white; font:inherit; font-size:14px; font-weight:800; cursor:pointer; transition:background .15s ease,transform .15s ease; }
+    button:hover:not(:disabled) { transform:translateY(-1px); background:var(--forest-dark); }
+    button:disabled { opacity:.72; cursor:wait; }
+    .status { min-height:22px; margin:11px 0 0; color:#9b4334; font-size:12px; }
+    .note { margin:20px 0 0; padding-top:17px; border-top:1px solid var(--line); color:var(--muted); font-size:10px; line-height:1.5; }
+    @media (max-width:420px) { body { padding:13px; } .gate { border-radius:20px; } .brand { margin-bottom:29px; } }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { transition-duration:.01ms!important; } }
+  </style>
+</head>
+<body>
+  <main class="gate" id="password-gate">
+    <div class="brand" aria-label="O’Reilly Foo Camp">
+      <span class="brand-mark" aria-hidden="true">FOO</span>
+      <span class="brand-copy"><strong>O’Reilly Foo Camp</strong><span>Weekend board archive · 2026</span></span>
+    </div>
+    <p class="eyebrow">Lighthaven Campus · Saturday &amp; Sunday</p>
+    <h1>Foo Camp <span style="color:#6b8952">2026</span></h1>
+    <p class="summary">The schedule wall is ready. Enter the shared passphrase to open the boards and campus map.</p>
+    <div id="unlock-form">
+      <label for="passphrase">Shared passphrase</label>
+      <input id="passphrase" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required>
+      <button id="unlock-button" type="button">Open the schedule</button>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </div>
+    <p class="note">Your passphrase isn’t sent to a server. This page does not create viewer accounts.</p>
+    <noscript><p class="status">JavaScript is required to unlock the encrypted schedule.</p></noscript>
+  </main>
+  <script>
+    (() => {
+      "use strict";
+      const input = document.getElementById("passphrase");
+      const button = document.getElementById("unlock-button");
+      const status = document.getElementById("status");
+
+      function decodeBase64(value) {
+        const binary = atob(value);
+        return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+      }
+
+      async function decryptSite(passphrase) {
+        if (!window.crypto || !window.crypto.subtle) throw new Error("This browser needs a secure connection to unlock the page.");
+        const response = await fetch("vault.json", { cache: "no-store", credentials: "same-origin" });
+        if (!response.ok) throw new Error("The encrypted schedule could not be loaded.");
+        const vault = await response.json();
+        if (vault.version !== 1 || vault.aad !== "foo-camp-2026-site:v1" || vault.kdf !== "PBKDF2-SHA-256" || vault.cipher !== "AES-256-GCM" || vault.iterations !== 750000) {
+          throw new Error("The encrypted schedule has an unsupported format.");
+        }
+
+        const keyMaterial = await window.crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+        const key = await window.crypto.subtle.deriveKey(
+          { name: "PBKDF2", salt: decodeBase64(vault.salt), iterations: vault.iterations, hash: "SHA-256" },
+          keyMaterial,
+          { name: "AES-GCM", length: 256 },
+          false,
+          ["decrypt"],
+        );
+        const clearText = await window.crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: decodeBase64(vault.iv), additionalData: new TextEncoder().encode(vault.aad), tagLength: 128 },
+          key,
+          decodeBase64(vault.data),
+        );
+        return new TextDecoder().decode(clearText);
+      }
+
+      async function unlock() {
+        if (button.disabled) return;
+        if (!input.value) {
+          input.focus();
+          return;
+        }
+        button.disabled = true;
+        status.textContent = "Unlocking the schedule…";
+        let passphrase = input.value;
+        input.value = "";
+        try {
+          const page = await decryptSite(passphrase);
+          passphrase = "";
+          document.open();
+          document.write(page);
+          document.close();
+        } catch (error) {
+          passphrase = "";
+          status.textContent = error && error.name === "OperationError"
+            ? "That passphrase didn’t match."
+            : "The schedule could not be unlocked. Check your connection and try again.";
+          input.focus();
+          button.disabled = false;
+        }
+      }
+
+      button.addEventListener("click", unlock);
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          unlock();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
